@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>物理基礎 任意課題 (2025秋)</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body {
+        font-family: "IBM Plex Sans JP", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #f4f4f9;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        padding: 1rem;
+      }
+
+      h1 {
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 5px;
+      }
+
+      #main-container {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+        width: 95%;
+        max-width: 1400px;
+      }
+
+      #simulation-column {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      #simulation-container {
+        border: 1px solid #bdc3c7;
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        padding: 10px;
+        position: relative;
+      }
+
+      #sim-canvas {
+        width: 100%;
+        height: auto;
+        display: block;
+        background-color: #fdfdfd;
+      }
+
+      #controls-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      }
+
+      #controls-container button {
+        font-family: "IBM Plex Sans JP", sans-serif;
+        font-size: 1rem;
+        padding: 0.6rem 1rem;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #3498db;
+        color: white;
+        transition: background-color 0.2s;
+      }
+
+      #controls-container button:hover {
+        background-color: #2980b9;
+      }
+
+      #controls-container button:disabled {
+        background-color: #bdc3c7;
+        cursor: not-allowed;
+      }
+
+      #play-pause-btn.playing {
+        background-color: #e74c3c;
+      }
+
+      #play-pause-btn.playing:hover {
+        background-color: #c0392b;
+      }
+
+      #data-container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        padding: 1.5rem;
+        font-family: "IBM Plex Sans JP", "Courier New", Courier, monospace;
+        font-size: 0.95rem;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+
+      #data-container h2 {
+        font-family: "IBM Plex Sans JP", sans-serif;
+        color: #2c3e50;
+        margin-top: 0;
+        border-bottom: 1px solid #ecf0f1;
+        padding-bottom: 8px;
+      }
+
+      #data-container h3 {
+        font-family: "IBM Plex Sans JP", sans-serif;
+        color: #2980b9;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      #data-container .data-group {
+        border-left: 3px solid #ecf0f1;
+        padding-left: 10px;
+      }
+
+      #data-container .data-group strong {
+        display: inline-block;
+        width: 100px;
+        color: #7f8c8d;
+      }
+
+      #data-container .data-group span {
+        display: inline-block;
+        min-width: 120px;
+        font-weight: bold;
+        color: #2c3e50;
+      }
+
+      /* Styles for state inputs */
+      #data-container .data-group input[type="number"] {
+        font-family: "IBM Plex Sans JP", monospace;
+        font-size: 0.95rem;
+        font-weight: bold;
+        color: #2c3e50;
+        border: 1px solid #ecf0f1;
+        border-radius: 4px;
+        padding: 4px;
+        width: 120px;
+        background-color: #fdfdfd;
+      }
+
+      #data-container .data-group input[type="number"]:disabled {
+        background-color: #ecf0f1;
+        color: #7f8c8d;
+        border-color: #e0e0e0;
+      }
+
+      #data-container .force-group span {
+        color: #c0392b;
+      }
+
+      #data-container .force-group .positive {
+        color: #27ae60;
+      }
+
+      #m1-header {
+        color: #c0392b;
+      }
+      #m2-header {
+        color: #2980b9;
+      }
+
+      /* Graph styles */
+      #graph-container {
+        grid-column: 1 / 2; /* Span graph under simulation column */
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        padding: 1rem;
+        margin-top: 1rem;
+      }
+
+      #graph-toggles {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 1rem;
+      }
+
+      #graph-toggles button {
+        font-family: "IBM Plex Sans JP", sans-serif;
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid #bdc3c7;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #f4f4f9;
+        color: #7f8c8d;
+        transition: background-color 0.2s, color 0.2s;
+      }
+
+      #graph-toggles button.active {
+        background-color: #3498db;
+        color: white;
+        border-color: #3498db;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>物理基礎 任意課題 (2025秋)</h1>
+
+    <div id="main-container">
+      <div id="simulation-column">
+        <div id="simulation-container">
+          <canvas id="sim-canvas" width="1000" height="200"></canvas>
+        </div>
+        <div id="controls-container">
+          <button id="reset-btn">リセット</button>
+          <button id="rewind-btn">巻き戻し</button>
+          <button id="play-pause-btn">再生</button>
+          <button id="step-btn">１ステップ</button>
+          <button id="ff-btn">早送り (5x)</button>
+        </div>
+
+        <div id="graph-container">
+          <div id="graph-toggles">
+            <button id="pos-graph-btn" class="active">位置</button>
+            <button id="vel-graph-btn">速度</button>
+            <button id="acc-graph-btn">加速度</button>
+          </div>
+          <canvas id="sim-graph" height="150"></canvas>
+        </div>
+      </div>
+
+      <div id="data-container">
+        <h2>シミュレーション状態</h2>
+        <h3>全体の状態</h3>
+        <div class="data-group">
+          <p>
+            <strong>時刻 (t):</strong> <span id="time-display">0.000</span>
+            <strong>秒</strong>
+          </p>
+          <p>
+            <strong>タイムステップ:</strong>
+            <input
+              type="number"
+              id="dt-input"
+              value="0.01"
+              step="0.001"
+              min="0.001"
+            />
+            <strong>秒</strong>
+          </p>
+        </div>
+
+        <h3 id="m1-header">赤台車 (m₁)</h3>
+        <div class="data-group">
+          <p>
+            <strong>位置 (x₁):</strong>
+            <input type="number" id="x1-input" step="0.001" />
+            <strong>m</strong>
+          </p>
+          <p>
+            <strong>速度 (v₁):</strong>
+            <input type="number" id="v1-input" step="0.001" />
+            <strong>m/s</strong>
+          </p>
+          <p>
+            <strong>加速度 (a₁):</strong>
+            <span id="a1-display">0.000</span> <strong>m/s²</strong>
+          </p>
+        </div>
+
+        <h4 class="force-group">m₁にかかる力</h4>
+        <div class="data-group force-group">
+          <p>
+            <strong>左のばねの力:</strong>
+            <span id="f-k1-display">0.000</span> <strong>N</strong>
+          </p>
+          <p>
+            <strong>中央のばねの力:</strong>
+            <span id="f-k2on1-display">0.000</span> <strong>N</strong>
+          </p>
+          <p>
+            <strong>合力:</strong> <span id="f-net1-display">0.000</span>
+            <strong>N</strong>
+          </p>
+        </div>
+
+        <h3 id="m2-header">青台車 (m₂)</h3>
+        <div class="data-group">
+          <p>
+            <strong>位置 (x₂):</strong>
+            <input type="number" id="x2-input" step="0.001" />
+            <strong>m</strong>
+          </p>
+          <p>
+            <strong>速度 (v₂):</strong>
+            <input type="number" id="v2-input" step="0.001" />
+            <strong>m/s</strong>
+          </p>
+          <p>
+            <strong>加速度 (a₂):</strong>
+            <span id="a2-display">0.000</span> <strong>m/s²</strong>
+          </p>
+        </div>
+
+        <h4 class="force-group">m₂にかかる力</h4>
+        <div class="data-group force-group">
+          <p>
+            <strong>中央のばねの力:</strong>
+            <span id="f-k2on2-display">0.000</span> <strong>N</strong>
+          </p>
+          <p>
+            <strong>右のばねの力:</strong>
+            <span id="f-k3-display">0.000</span> <strong>N</strong>
+          </p>
+          <p>
+            <strong>合力:</strong> <span id="f-net2-display">0.000</span>
+            <strong>N</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // --- 1. Simulation Constants & State ---
+        const params = {
+          m1: 0.25, // kg
+          m2: 0.25, // kg
+          k1: 3.6, // N/m
+          k2: 3.5, // N/m
+          k3: 3.6, // N/m
+          L_rail: 1.2, // m
+          x1_eq: 0.368, // m
+          x2_eq: 0.814, // m
+          L1_nat: 0.368,
+          L2_nat: 0.446,
+          L3_nat: 0.386,
+        };
+
+        const initialConditions = {
+          // Default initial conditions
+          x1: 0.468, // m
+          v1: 0, // m/s
+          x2: 0.814, // m
+          v2: 0, // m/s
+          dt: 0.01, // s
+        };
+
+        let state = {}; // Holds the current simulation state
+        let history = []; // Holds past states for rewind
+        let simControls = {
+          isRunning: false,
+          playbackSpeed: 1.0,
+          animationFrameId: null,
+        };
+
+        // --- 2. DOM Element References ---
+        const canvas = document.getElementById("sim-canvas");
+        const ctx = canvas.getContext("2d");
+
+        const resetBtn = document.getElementById("reset-btn");
+        const rewindBtn = document.getElementById("rewind-btn");
+        const playPauseBtn = document.getElementById("play-pause-btn");
+        const stepBtn = document.getElementById("step-btn");
+        const ffBtn = document.getElementById("ff-btn");
+
+        // State Inputs
+        const dtInput = document.getElementById("dt-input");
+        const x1Input = document.getElementById("x1-input");
+        const v1Input = document.getElementById("v1-input");
+        const x2Input = document.getElementById("x2-input");
+        const v2Input = document.getElementById("v2-input");
+        const stateInputs = [dtInput, x1Input, v1Input, x2Input, v2Input];
+
+        // Data Displays
+        const timeDisplay = document.getElementById("time-display");
+        const a1Display = document.getElementById("a1-display");
+        const a2Display = document.getElementById("a2-display");
+        const f_k1_display = document.getElementById("f-k1-display");
+        const f_k2on1_display = document.getElementById("f-k2on1-display");
+        const f_net1_display = document.getElementById("f-net1-display");
+        const f_k2on2_display = document.getElementById("f-k2on2-display");
+        const f_k3_display = document.getElementById("f-k3-display");
+        const f_net2_display = document.getElementById("f-net2-display");
+
+        // Graph elements
+        const graphCtx = document.getElementById("sim-graph").getContext("2d");
+        const posGraphBtn = document.getElementById("pos-graph-btn");
+        const velGraphBtn = document.getElementById("vel-graph-btn");
+        const accGraphBtn = document.getElementById("acc-graph-btn");
+        let simChart;
+        let currentGraphView = "position"; // 'position', 'velocity', or 'acceleration'
+
+        // --- 3. Physics & Drawing Constants ---
+        const C_PADDING = 50;
+        const C_WIDTH = canvas.width;
+        const C_HEIGHT = canvas.height;
+        const C_DRAW_WIDTH = C_WIDTH - 2 * C_PADDING; // 900
+        const Y_RAIL = C_HEIGHT * 0.5;
+        const Y_FORCE_M1 = C_HEIGHT * 0.25;
+        const Y_FORCE_M2 = C_HEIGHT * 0.75;
+        const CART_SIZE = 40; // pixels
+        const PX_TO_M_SCALE = params.L_rail / C_DRAW_WIDTH; // m/px
+        const CART_WIDTH_M = CART_SIZE * PX_TO_M_SCALE; // ~0.0533m
+        const CART_HALF_WIDTH_M = CART_WIDTH_M / 2.0;
+
+        // --- 4. Physics Calculation Engine ---
+
+        function calculateDerivatives(x1, x2) {
+          const L1 = x1;
+          const L2 = x2 - x1;
+          const L3 = params.L_rail - x2;
+
+          const Fs1 = -params.k1 * (L1 - params.L1_nat);
+          const Fs2_on1 = params.k2 * (L2 - params.L2_nat);
+          const Fs2_on2 = -params.k2 * (L2 - params.L2_nat);
+          const Fs3 = params.k3 * (L3 - params.L3_nat);
+
+          const Fnet1 = Fs1 + Fs2_on1;
+          const Fnet2 = Fs2_on2 + Fs3;
+
+          const a1 = Fnet1 / params.m1;
+          const a2 = Fnet2 / params.m2;
+
+          return { Fs1, Fs2_on1, Fs2_on2, Fs3, Fnet1, Fnet2, a1, a2 };
+        }
+
+        function simulationStep() {
+          const dt = initialConditions.dt; // Use the stored dt value
+          const dt_sq = dt * dt;
+
+          const { x1, v1, a1, x2, v2, a2 } = state;
+
+          const x1_new = x1 + v1 * dt + 0.5 * a1 * dt_sq;
+          const x2_new = x2 + v2 * dt + 0.5 * a2 * dt_sq;
+
+          const newDerivs = calculateDerivatives(x1_new, x2_new);
+          const a1_new = newDerivs.a1;
+          const a2_new = newDerivs.a2;
+
+          const v1_new = v1 + 0.5 * (a1 + a1_new) * dt;
+          const v2_new = v2 + 0.5 * (a2 + a2_new) * dt;
+
+          // Update state
+          state.t += dt;
+          state.x1 = x1_new;
+          state.v1 = v1_new;
+          state.a1 = a1_new;
+          state.x2 = x2_new;
+          state.v2 = v2_new;
+          state.a2 = a2_new;
+          Object.assign(state, newDerivs);
+
+          // Save to history
+          const stateCopy = { ...state };
+          history.push(stateCopy);
+
+          // Add to graph
+          addDataToGraph(stateCopy);
+        }
+
+        // --- 5. Drawing Engine (Canvas) ---
+
+        function scaleX(x_world) {
+          return C_PADDING + (x_world / params.L_rail) * C_DRAW_WIDTH;
+        }
+
+        function drawRail() {
+          ctx.strokeStyle = "#34495e";
+          ctx.lineWidth = 3;
+
+          ctx.beginPath();
+          ctx.moveTo(scaleX(0), Y_RAIL);
+          ctx.lineTo(scaleX(params.L_rail), Y_RAIL);
+          ctx.stroke();
+
+          ctx.fillStyle = "#7f8c8d";
+          ctx.fillRect(scaleX(0) - 10, Y_RAIL - 30, 10, 60);
+          ctx.fillRect(scaleX(params.L_rail), Y_RAIL - 30, 10, 60);
+
+          ctx.fillStyle = "#27ae60";
+          ctx.font = '12px "IBM Plex Sans JP", Arial';
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          const x1_eq_c = scaleX(params.x1_eq);
+          const x2_eq_c = scaleX(params.x2_eq);
+          ctx.beginPath();
+          ctx.moveTo(x1_eq_c, Y_RAIL - 10);
+          ctx.lineTo(x1_eq_c, Y_RAIL + 10);
+          ctx.stroke();
+          ctx.fillText("equilibrium", x1_eq_c, Y_RAIL + 15);
+
+          ctx.beginPath();
+          ctx.moveTo(x2_eq_c, Y_RAIL - 10);
+          ctx.lineTo(x2_eq_c, Y_RAIL + 10);
+          ctx.stroke();
+          ctx.fillText("equilibrium", x2_eq_c, Y_RAIL + 15);
+        }
+
+        function drawSpring(x1_c, y1_c, x2_c, y2_c, segments = 15) {
+          const length_c = Math.abs(x2_c - x1_c);
+          if (length_c < 1) return;
+
+          const amplitude = Math.min(10, (length_c / segments) * 0.8);
+
+          ctx.strokeStyle = "#555";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x1_c, y1_c);
+          for (let i = 1; i < segments; i++) {
+            const x_pos = x1_c + (i / segments) * (x2_c - x1_c);
+            const y_offset = i % 2 === 0 ? amplitude : -amplitude;
+            ctx.lineTo(x_pos, y1_c + y_offset);
+          }
+          ctx.lineTo(x2_c, y2_c);
+          ctx.stroke();
+        }
+
+        function drawCart(x_c, y_c, color, label) {
+          ctx.fillStyle = color;
+          ctx.strokeStyle = "#2c3e50";
+          ctx.lineWidth = 2;
+          ctx.fillRect(
+            x_c - CART_SIZE / 2,
+            y_c - CART_SIZE / 2,
+            CART_SIZE,
+            CART_SIZE
+          );
+          ctx.strokeRect(
+            x_c - CART_SIZE / 2,
+            y_c - CART_SIZE / 2,
+            CART_SIZE,
+            CART_SIZE
+          );
+
+          ctx.fillStyle = "#fff";
+          ctx.font = 'bold 16px "IBM Plex Sans JP", Arial';
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, x_c, y_c);
+        }
+
+        // Updated drawForceArrow function
+        function drawForceArrowToEquilibrium(
+          x_current_c,
+          y_c,
+          x_eq_c,
+          label,
+          force
+        ) {
+          const ARROW_HEAD_SIZE = 10;
+
+          // compute direction from current to equilibrium
+          const direction = Math.sign(x_eq_c - x_current_c);
+
+          // draw line from current position to equilibrium position
+          ctx.strokeStyle = direction > 0 ? "#27ae60" : "#c0392b";
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.lineWidth = Math.min(15, Math.abs(force) * 3);
+
+          ctx.beginPath();
+          ctx.moveTo(x_current_c, y_c);
+          ctx.lineTo(x_eq_c, y_c);
+          ctx.stroke();
+
+          // arrow head at equilibrium
+          ctx.beginPath();
+          ctx.moveTo(x_eq_c, y_c);
+          ctx.lineTo(
+            x_eq_c - direction * ARROW_HEAD_SIZE,
+            y_c - ARROW_HEAD_SIZE * 0.6
+          );
+          ctx.lineTo(
+            x_eq_c - direction * ARROW_HEAD_SIZE,
+            y_c + ARROW_HEAD_SIZE * 0.6
+          );
+          ctx.closePath();
+          ctx.fill();
+
+          // label above arrow midpoint
+          const mid_x = (x_current_c + x_eq_c) / 2;
+          ctx.fillStyle = "#333";
+          ctx.font = '12px "IBM Plex Sans JP", monospace';
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          ctx.fillText(`${label}: ${force.toFixed(2)}N`, mid_x, y_c - 10);
+        }
+
+        function draw() {
+          ctx.clearRect(0, 0, C_WIDTH, C_HEIGHT);
+          const x1_c = scaleX(state.x1);
+          const x2_c = scaleX(state.x2);
+
+          drawRail();
+          drawSpring(scaleX(0), Y_RAIL, x1_c, Y_RAIL);
+          drawSpring(x1_c, Y_RAIL, x2_c, Y_RAIL);
+          drawSpring(x2_c, Y_RAIL, scaleX(params.L_rail), Y_RAIL);
+          drawCart(x1_c, Y_RAIL, "#e74c3c", "m₁");
+          drawCart(x2_c, Y_RAIL, "#3498db", "m₂");
+
+          // Arrow for m₁ → its equilibrium position
+          drawForceArrowToEquilibrium(
+            scaleX(state.x1),
+            Y_FORCE_M1,
+            scaleX(params.x1_eq),
+            "Fₖ₁",
+            state.Fnet1
+          );
+
+          // Arrow for m₂ → its equilibrium position
+          drawForceArrowToEquilibrium(
+            scaleX(state.x2),
+            Y_FORCE_M2,
+            scaleX(params.x2_eq),
+            "Fₖ₃",
+            state.Fnet2
+          );
+        }
+
+        // --- 6. Data Display & State Update ---
+
+        function formatNumber(num) {
+          return num.toFixed(3).padStart(8);
+        }
+
+        function formatForce(num) {
+          const str = num.toFixed(3).padStart(8);
+          const className = num >= 0 ? "positive" : "";
+          return `<span class="${className}">${str}</span>`;
+        }
+
+        function updateDataDisplay() {
+          timeDisplay.textContent = formatNumber(state.t);
+
+          a1Display.textContent = formatNumber(state.a1);
+          f_k1_display.innerHTML = formatForce(state.Fs1);
+          f_k2on1_display.innerHTML = formatForce(state.Fs2_on1);
+          f_net1_display.innerHTML = formatForce(state.Fnet1);
+
+          a2Display.textContent = formatNumber(state.a2);
+          f_k2on2_display.innerHTML = formatForce(state.Fs2_on2);
+          f_k3_display.innerHTML = formatForce(state.Fs3);
+          f_net2_display.innerHTML = formatForce(state.Fnet2);
+
+          dtInput.value = initialConditions.dt.toFixed(3);
+          x1Input.value = state.x1.toFixed(3);
+          v1Input.value = state.v1.toFixed(3);
+          x2Input.value = state.x2.toFixed(3);
+          v2Input.value = state.v2.toFixed(3);
+        }
+
+        function handleStateInputChange() {
+          let x1 = parseFloat(x1Input.value);
+          let x2 = parseFloat(x2Input.value);
+          let v1 = parseFloat(v1Input.value);
+          let v2 = parseFloat(v2Input.value);
+          let dt = parseFloat(dtInput.value);
+
+          // --- Validation ---
+          const min_pos = CART_HALF_WIDTH_M;
+          const max_pos = params.L_rail - CART_HALF_WIDTH_M;
+
+          // Clamp x1 within bounds and relative to x2
+          x1 = Math.max(min_pos, Math.min(x1, x2 - CART_WIDTH_M));
+          x1Input.value = x1.toFixed(3); // Update input field if value was clamped
+
+          // Clamp x2 within bounds and relative to x1
+          x2 = Math.max(x1 + CART_WIDTH_M, Math.min(x2, max_pos));
+          x2Input.value = x2.toFixed(3); // Update input field if value was clamped
+
+          // Clamp dt
+          if (dt < 0.001) dt = 0.001; // Minimum dt
+          dtInput.value = dt.toFixed(3);
+
+          initialConditions.x1 = x1;
+          initialConditions.v1 = v1;
+          initialConditions.x2 = x2;
+          initialConditions.v2 = v2;
+          initialConditions.dt = dt;
+
+          state.x1 = x1;
+          state.v1 = v1;
+          state.x2 = x2;
+          state.v2 = v2;
+
+          const newDerivs = calculateDerivatives(state.x1, state.x2);
+          Object.assign(state, newDerivs);
+
+          history = [{ ...state }];
+
+          updateDataDisplay();
+          draw();
+          initGraph();
+        }
+
+        // --- 7. Graphing (Chart.js) ---
+
+        function initGraph() {
+          if (simChart) {
+            simChart.destroy();
+          }
+
+          const { datasets, yLabel } = getGraphDatasets(currentGraphView);
+
+          simChart = new Chart(graphCtx, {
+            type: "line",
+            data: {
+              labels: history.map((s) => s.t.toFixed(2)),
+              datasets: datasets,
+            },
+            options: {
+              animation: false,
+              scales: {
+                y: {
+                  title: { display: true, text: yLabel },
+                },
+                x: {
+                  title: { display: true, text: "時間 (t)" },
+                },
+              },
+              elements: {
+                point: { radius: 1 },
+              },
+              plugins: {
+                legend: { position: "top" },
+              },
+            },
+          });
+        }
+
+        function getGraphDatasets(view) {
+          let datasets = [];
+          let yLabel = "";
+
+          switch (view) {
+            case "position":
+              yLabel = "位置 (m)";
+              datasets = [
+                {
+                  label: "x₁ (赤)",
+                  data: history.map((s) => s.x1),
+                  borderColor: "#e74c3c",
+                  fill: false,
+                },
+                {
+                  label: "x₂ (青)",
+                  data: history.map((s) => s.x2),
+                  borderColor: "#3498db",
+                  fill: false,
+                },
+              ];
+              break;
+            case "velocity":
+              yLabel = "速度 (m/s)";
+              datasets = [
+                {
+                  label: "v₁ (赤)",
+                  data: history.map((s) => s.v1),
+                  borderColor: "#e74c3c",
+                  fill: false,
+                },
+                {
+                  label: "v₂ (青)",
+                  data: history.map((s) => s.v2),
+                  borderColor: "#3498db",
+                  fill: false,
+                },
+              ];
+              break;
+            case "acceleration":
+              yLabel = "加速度 (m/s²)";
+              datasets = [
+                {
+                  label: "a₁ (赤)",
+                  data: history.map((s) => s.a1),
+                  borderColor: "#e74c3c",
+                  fill: false,
+                },
+                {
+                  label: "a₂ (青)",
+                  data: history.map((s) => s.a2),
+                  borderColor: "#3498db",
+                  fill: false,
+                },
+              ];
+              break;
+          }
+          return { datasets, yLabel };
+        }
+
+        function addDataToGraph(newState) {
+          if (!simChart) return;
+
+          simChart.data.labels.push(newState.t.toFixed(2));
+
+          let dataPoints = [];
+          switch (currentGraphView) {
+            case "position":
+              dataPoints = [newState.x1, newState.x2];
+              break;
+            case "velocity":
+              dataPoints = [newState.v1, newState.v2];
+              break;
+            case "acceleration":
+              dataPoints = [newState.a1, newState.a2];
+              break;
+          }
+
+          simChart.data.datasets[0].data.push(dataPoints[0]);
+          simChart.data.datasets[1].data.push(dataPoints[1]);
+        }
+
+        function removeDataFromGraph() {
+          if (!simChart) return;
+          simChart.data.labels.pop();
+          simChart.data.datasets.forEach((dataset) => dataset.data.pop());
+        }
+
+        function updateGraphView() {
+          const { datasets, yLabel } = getGraphDatasets(currentGraphView);
+          simChart.data.labels = history.map((s) => s.t.toFixed(2));
+          simChart.data.datasets = datasets;
+          simChart.options.scales.y.title.text = yLabel;
+          simChart.update();
+        }
+
+        // --- 8. Control Logic & Main Loop ---
+
+        function toggleStateInputs(isLocked) {
+          stateInputs.forEach((input) => (input.disabled = isLocked));
+        }
+
+        function resetSimulation() {
+          simControls.isRunning = false;
+          if (simControls.animationFrameId) {
+            cancelAnimationFrame(simControls.animationFrameId);
+            simControls.animationFrameId = null;
+          }
+
+          // Reset state from the user-editable initial conditions
+          state = {
+            t: 0,
+            x1: initialConditions.x1,
+            v1: initialConditions.v1,
+            x2: initialConditions.x2,
+            v2: initialConditions.v2,
+          };
+
+          const initialDerivs = calculateDerivatives(state.x1, state.x2);
+          Object.assign(state, initialDerivs);
+
+          history = [{ ...state }]; // History starts with one state
+
+          // Update UI
+          playPauseBtn.textContent = "再生";
+          playPauseBtn.classList.remove("playing");
+          toggleStateInputs(false); // Unlock inputs
+
+          updateDataDisplay();
+          draw();
+          initGraph(); // Initialize graph
+        }
+
+        function mainLoop() {
+          if (!simControls.isRunning) return;
+
+          if (simControls.playbackSpeed > 0) {
+            for (let i = 0; i < simControls.playbackSpeed; i++) {
+              simulationStep(); // This adds to graph
+            }
+          } else {
+            // Rewinding
+            for (let i = 0; i < Math.abs(simControls.playbackSpeed); i++) {
+              if (history.length > 1) {
+                history.pop();
+                removeDataFromGraph(); // Remove from graph
+                const prevState = history[history.length - 1];
+                Object.assign(state, prevState);
+              } else {
+                pauseSimulation();
+                break;
+              }
+            }
+          }
+
+          updateDataDisplay();
+          draw();
+          simChart.update(); // Batch update the graph
+
+          simControls.animationFrameId = requestAnimationFrame(mainLoop);
+        }
+
+        function playSimulation(speed = 1.0) {
+          simControls.isRunning = true;
+          simControls.playbackSpeed = speed;
+          playPauseBtn.textContent = "一時停止";
+          playPauseBtn.classList.add("playing");
+          toggleStateInputs(true); // Lock inputs
+
+          if (simControls.animationFrameId) {
+            cancelAnimationFrame(simControls.animationFrameId);
+          }
+          mainLoop();
+        }
+
+        function pauseSimulation() {
+          simControls.isRunning = false;
+          simControls.playbackSpeed = 1.0;
+          playPauseBtn.textContent = "再生";
+          playPauseBtn.classList.remove("playing");
+
+          if (simControls.animationFrameId) {
+            cancelAnimationFrame(simControls.animationFrameId);
+            simControls.animationFrameId = null;
+          }
+        }
+
+        function stepSimulation() {
+          pauseSimulation();
+          toggleStateInputs(true); // Lock inputs
+          simulationStep();
+          updateDataDisplay();
+          draw();
+          simChart.update();
+        }
+
+        // --- 9. Event Listeners ---
+
+        playPauseBtn.addEventListener("click", () => {
+          if (simControls.isRunning) {
+            pauseSimulation();
+          } else {
+            playSimulation(1.0);
+          }
+        });
+
+        stepBtn.addEventListener("click", stepSimulation);
+        resetBtn.addEventListener("click", resetSimulation);
+        ffBtn.addEventListener("click", () => playSimulation(5.0));
+        rewindBtn.addEventListener("click", () => playSimulation(-5.0));
+
+        // State input listeners
+        stateInputs.forEach((input) => {
+          input.addEventListener("change", handleStateInputChange);
+        });
+
+        // Graph toggle listeners
+        posGraphBtn.addEventListener("click", () => {
+          currentGraphView = "position";
+          posGraphBtn.classList.add("active");
+          velGraphBtn.classList.remove("active");
+          accGraphBtn.classList.remove("active");
+          updateGraphView();
+        });
+        velGraphBtn.addEventListener("click", () => {
+          currentGraphView = "velocity";
+          posGraphBtn.classList.remove("active");
+          velGraphBtn.classList.add("active");
+          accGraphBtn.classList.remove("active");
+          updateGraphView();
+        });
+        accGraphBtn.addEventListener("click", () => {
+          currentGraphView = "acceleration";
+          posGraphBtn.classList.remove("active");
+          velGraphBtn.classList.remove("active");
+          accGraphBtn.classList.add("active");
+          updateGraphView();
+        });
+
+        // --- 10. Initial Setup ---
+        resetSimulation();
+      });
+    </script>
+  </body>
+</html>

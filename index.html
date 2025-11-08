@@ -550,50 +550,47 @@
           ctx.fillText(label, x_c, y_c);
         }
 
-        // Updated drawForceArrow function
-        function drawForceArrowToEquilibrium(
-          x_current_c,
-          y_c,
-          x_eq_c,
-          label,
-          force
-        ) {
-          const ARROW_HEAD_SIZE = 10;
+        // Replace drawForceArrow() and its usage with the following:
 
-          // compute direction from current to equilibrium
-          const direction = Math.sign(x_eq_c - x_current_c);
+        function drawForceArrow(x_c, y_c, force, label) {
+          const SCALE = 200; // pixel scale per 1N, adjust for visualization
+          const arrowLength = Math.abs(force) * SCALE;
+          const direction = Math.sign(force);
+          const ARROW_HEAD_SIZE = 8;
 
-          // draw line from current position to equilibrium position
-          ctx.strokeStyle = direction > 0 ? "#27ae60" : "#c0392b";
-          ctx.fillStyle = ctx.strokeStyle;
-          ctx.lineWidth = Math.min(15, Math.abs(force) * 3);
+          ctx.strokeStyle = force > 0 ? "#27ae60" : "#c0392b";
+          ctx.fillStyle = force > 0 ? "#27ae60" : "#c0392b";
+          ctx.lineWidth = 2;
 
+          const x_end = x_c + direction * arrowLength;
+
+          // Draw line
           ctx.beginPath();
-          ctx.moveTo(x_current_c, y_c);
-          ctx.lineTo(x_eq_c, y_c);
+          ctx.moveTo(x_c, y_c);
+          ctx.lineTo(x_end, y_c);
           ctx.stroke();
 
-          // arrow head at equilibrium
+          // Arrow head
           ctx.beginPath();
-          ctx.moveTo(x_eq_c, y_c);
+          ctx.moveTo(x_end, y_c);
           ctx.lineTo(
-            x_eq_c - direction * ARROW_HEAD_SIZE,
+            x_end - direction * ARROW_HEAD_SIZE,
             y_c - ARROW_HEAD_SIZE * 0.6
           );
           ctx.lineTo(
-            x_eq_c - direction * ARROW_HEAD_SIZE,
+            x_end - direction * ARROW_HEAD_SIZE,
             y_c + ARROW_HEAD_SIZE * 0.6
           );
           ctx.closePath();
           ctx.fill();
 
-          // label above arrow midpoint
-          const mid_x = (x_current_c + x_eq_c) / 2;
+          // Label
           ctx.fillStyle = "#333";
           ctx.font = '12px "IBM Plex Sans JP", monospace';
           ctx.textAlign = "center";
           ctx.textBaseline = "bottom";
-          ctx.fillText(`${label}: ${force.toFixed(2)}N`, mid_x, y_c - 10);
+          const mid_x = (x_c + x_end) / 2;
+          ctx.fillText(`${label}: ${force.toFixed(2)}N`, mid_x, y_c - 5);
         }
 
         function draw() {
@@ -608,23 +605,23 @@
           drawCart(x1_c, Y_RAIL, "#e74c3c", "m₁");
           drawCart(x2_c, Y_RAIL, "#3498db", "m₂");
 
-          // Arrow for m₁ → its equilibrium position
-          drawForceArrowToEquilibrium(
-            scaleX(state.x1),
-            Y_FORCE_M1,
-            scaleX(params.x1_eq),
-            "Fₖ₁",
-            state.Fnet1
+          // m1: left spring (Fs1) and middle spring (Fs2_on1)
+          drawForceArrow(x1_c, Y_FORCE_M1 - 15, state.Fs1, "左のばねの力");
+          drawForceArrow(
+            x1_c,
+            Y_FORCE_M1 + 15,
+            state.Fs2_on1,
+            "中央のばねの力"
           );
 
-          // Arrow for m₂ → its equilibrium position
-          drawForceArrowToEquilibrium(
-            scaleX(state.x2),
-            Y_FORCE_M2,
-            scaleX(params.x2_eq),
-            "Fₖ₃",
-            state.Fnet2
+          // m2: middle spring (Fs2_on2) and right spring (Fs3)
+          drawForceArrow(
+            x2_c,
+            Y_FORCE_M2 - 15,
+            state.Fs2_on2,
+            "中央のばねの力"
           );
+          drawForceArrow(x2_c, Y_FORCE_M2 + 15, state.Fs3, "右のばねの力");
         }
 
         // --- 6. Data Display & State Update ---

@@ -9,6 +9,24 @@
       rel="stylesheet"
     />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css"
+      integrity="sha384-sN1MATC9LHBhEqvEuLwlU8NnK3ESBvL95oBYP+XFj2pI/E1vVLhIuXyMP9/xL/K6"
+      crossorigin="anonymous"
+    />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"
+      integrity="sha384-hIoBPJpTUs7N+2RprBc2smN0OKp/6G9o2SK/i/UUi3UjD+p/C1S2V1tS1inQG3Fv"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"
+      integrity="sha384-mDqmlyTqj+BI5udjEaT5GgIeBvHnB3MECvsp/w/1ii+t5D0iFqNQPGkpk020OouP"
+      crossorigin="anonymous"
+    ></script>
     <style>
       body {
         font-family: "IBM Plex Sans JP", -apple-system, BlinkMacSystemFont,
@@ -211,6 +229,42 @@
         color: white;
         border-color: #3498db;
       }
+
+      /* FFT Results Styles */
+      #fft-results-container {
+        margin-top: 1.5rem;
+        border-top: 2px solid #3498db;
+        padding-top: 1rem;
+      }
+      #fft-results-container h3 {
+        margin-top: 0;
+      }
+      .fft-result-item h4 {
+        font-family: "IBM Plex Sans JP", sans-serif;
+        color: #333;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+      }
+      .fft-result-item .math-font {
+        font-size: 1.1rem;
+        overflow-x: auto; /* Handle long equations */
+        padding: 5px;
+      }
+      .fft-result-item .plain-text {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 0.9rem;
+        background-color: #f9f9f9;
+        border: 1px solid #eee;
+        padding: 10px;
+        border-radius: 4px;
+        white-space: pre-wrap; /* Allow wrapping */
+        word-break: break-all;
+        cursor: text;
+        user-select: all;
+      }
+      .katex-display {
+        margin: 0.5em 0;
+      }
     </style>
   </head>
   <body>
@@ -226,6 +280,7 @@
           <button id="rewind-btn">巻き戻し</button>
           <button id="play-pause-btn">再生</button>
           <button id="step-btn">１ステップ</button>
+          <button id="fft-btn">FFT解析</button>
           <button id="ff-btn">早送り (5x)</button>
         </div>
 
@@ -327,6 +382,8 @@
             <strong>N</strong>
           </p>
         </div>
+
+        <div id="fft-results-container"></div>
       </div>
     </div>
 
@@ -373,6 +430,10 @@
         const playPauseBtn = document.getElementById("play-pause-btn");
         const stepBtn = document.getElementById("step-btn");
         const ffBtn = document.getElementById("ff-btn");
+        const fftBtn = document.getElementById("fft-btn"); // FFT Button
+        const fftResultsContainer = document.getElementById(
+          "fft-results-container"
+        );
 
         // State Inputs
         const dtInput = document.getElementById("dt-input");
@@ -862,6 +923,8 @@
           playPauseBtn.textContent = "再生";
           playPauseBtn.classList.remove("playing");
           toggleStateInputs(false); // Unlock inputs
+          fftBtn.disabled = true; // Disable FFT on reset
+          fftResultsContainer.innerHTML = ""; // Clear FFT results
 
           updateDataDisplay();
           draw();
@@ -903,6 +966,7 @@
           playPauseBtn.textContent = "一時停止";
           playPauseBtn.classList.add("playing");
           toggleStateInputs(true); // Lock inputs
+          fftBtn.disabled = true; // Disable FFT when running
 
           if (simControls.animationFrameId) {
             cancelAnimationFrame(simControls.animationFrameId);
@@ -915,6 +979,7 @@
           simControls.playbackSpeed = 1.0;
           playPauseBtn.textContent = "再生";
           playPauseBtn.classList.remove("playing");
+          fftBtn.disabled = history.length < 20; // Enable FFT if enough data
 
           if (simControls.animationFrameId) {
             cancelAnimationFrame(simControls.animationFrameId);
@@ -929,9 +994,141 @@
           updateDataDisplay();
           draw();
           simChart.update();
+          fftBtn.disabled = history.length < 20; // Update FFT button state
         }
 
-        // --- 9. Event Listeners ---
+        // --- 9. FFT / DFT Logic ---
+
+        /**
+         * Performs a Discrete Fourier Transform (DFT) on the input data.
+         * @param {number[]} data - Array of signal values.
+         * @returns { {re: number, im: number}[] } Array of complex numbers (real and imaginary parts).
+         */
+        function dft(data) {
+          const N = data.length;
+          let results = [];
+
+          for (let k = 0; k < N; k++) {
+            let sum_re = 0;
+            let sum_im = 0;
+            for (let n = 0; n < N; n++) {
+              const angle = (2 * Math.PI * k * n) / N;
+              sum_re += data[n] * Math.cos(angle);
+              sum_im -= data[n] * Math.sin(angle);
+            }
+            results.push({ re: sum_re, im: sum_im });
+          }
+          return results;
+        }
+
+        /**
+         * Analyzes history and displays FFT results.
+         */
+        function performFFTAnalysis() {
+          if (history.length < 20) {
+            fftResultsContainer.innerHTML =
+              "<h3>FFT 解析結果</h3><p>データが少なすぎます。最低20ステップ実行してください。</p>";
+            return;
+          }
+
+          fftResultsContainer.innerHTML =
+            "<h3>FFT 解析結果</h3><p>計算中...</p>";
+
+          // Run asynchronously to avoid locking the UI
+          setTimeout(() => {
+            const dataSeries = {
+              "x₁": history.map((s) => s.x1),
+              "x₂": history.map((s) => s.x2),
+              "v₁": history.map((s) => s.v1),
+              "v₂": history.map((s) => s.v2),
+              "a₁": history.map((s) => s.a1),
+              "a₂": history.map((s) => s.a2),
+            };
+
+            const N = history.length;
+            const dt = initialConditions.dt;
+            const T_total = N * dt; // Total time duration of the sample
+
+            let finalHtml = "<h3>FFT 解析結果</h3>";
+
+            for (const [label, data] of Object.entries(dataSeries)) {
+              const dft_results = dft(data);
+
+              // Find components
+              const dcComponent = {
+                amp: dft_results[0].re / N,
+                freq: 0,
+                phase: 0,
+              };
+              let acComponents = [];
+
+              for (let k = 1; k < Math.floor(N / 2); k++) {
+                const Xk = dft_results[k];
+                // A = 2/N * |Xk|
+                const amp = (2 / N) * Math.sqrt(Xk.re * Xk.re + Xk.im * Xk.im);
+                // freq = k / T_total
+                const freq_hz = k / T_total;
+                // phase = atan2(Re(Xk), -Im(Xk)) for A*sin(wt + phi)
+                const phase = Math.atan2(Xk.re, -Xk.im);
+
+                acComponents.push({ amp, freq: freq_hz, phase });
+              }
+
+              // Sort by amplitude and take top 3
+              acComponents.sort((a, b) => b.amp - a.amp);
+              const topComponents = [dcComponent];
+              topComponents.push(
+                ...acComponents.slice(0, 3).filter((c) => c.amp > 0.001)
+              ); // Threshold
+
+              // Build strings
+              let mathString = `${label}(t) \\approx `;
+              let plainString = `${label}(t) ≈ `;
+
+              topComponents.forEach((comp, index) => {
+                const ampStr = comp.amp.toFixed(3);
+                if (comp.freq === 0) {
+                  // DC component
+                  mathString += ampStr;
+                  plainString += ampStr;
+                } else {
+                  // AC component
+                  const omegaStr = (2 * Math.PI * comp.freq).toFixed(2);
+                  const phaseStr = comp.phase.toFixed(2);
+                  const sign = comp.phase >= 0 ? "+" : "";
+
+                  if (index > 0 && comp.amp > 0) {
+                    mathString += " + ";
+                    plainString += " + ";
+                  }
+                  mathString += `${ampStr} \\sin(${omegaStr}t ${sign} ${phaseStr})`;
+                  plainString += `${ampStr} * sin(${omegaStr}*t ${sign} ${phaseStr})`;
+                }
+              });
+
+              finalHtml += `
+                <div class="fft-result-item">
+                  <h4>${label} の解析</h4>
+                  <pre class="plain-text">${plainString}</pre>
+                </div>
+              `;
+            }
+
+            fftResultsContainer.innerHTML = finalHtml;
+
+            // Render the math
+            if (window.renderMathInElement) {
+              renderMathInElement(fftResultsContainer, {
+                delimiters: [
+                  { left: "$$", right: "$$", display: true },
+                  { left: "$", right: "$", display: false },
+                ],
+              });
+            }
+          }, 50); // 50ms timeout
+        }
+
+        // --- 10. Event Listeners ---
 
         playPauseBtn.addEventListener("click", () => {
           if (simControls.isRunning) {
@@ -945,6 +1142,7 @@
         resetBtn.addEventListener("click", resetSimulation);
         ffBtn.addEventListener("click", () => playSimulation(5.0));
         rewindBtn.addEventListener("click", () => playSimulation(-5.0));
+        fftBtn.addEventListener("click", performFFTAnalysis);
 
         // State input listeners
         stateInputs.forEach((input) => {
@@ -971,10 +1169,11 @@
           posGraphBtn.classList.remove("active");
           velGraphBtn.classList.remove("active");
           accGraphBtn.classList.add("active");
-          updateGraphView();
+          updateGraphV;
+          iew();
         });
 
-        // --- 10. Initial Setup ---
+        // --- 11. Initial Setup ---
         resetSimulation();
       });
     </script>
